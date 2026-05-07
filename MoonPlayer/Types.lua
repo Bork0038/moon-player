@@ -35,7 +35,7 @@ export type AnimationPlayer = {
 		AnimationPlayer, 
 		Frame: number, 
 		Callback: () -> any
-	) -> ()
+	) -> (),
 
 	OnMarkerReached: (
 		AnimationPlayer, 

@@ -6,6 +6,7 @@ local HttpService = game:GetService("HttpService")
 local RunService = game:GetService("RunService")
 
 local Interpolator = require("./Interpolator")
+local ApplyProp = require("@self/ApplyProp")
 local EaseFuncs = require("./EaseFuncs")
 local Compiler = require("./Compiler")
 
@@ -120,9 +121,8 @@ function Player:_restore()
 		local realInstance = instanceOverride[instanceId] 
 			or instances[instanceId]
 		
-		local isModel = realInstance.ClassName == "Model"
 		for name, value in props do 
-			self:_applyPropValue(realInstance, name, value, isModel)
+			ApplyProp(realInstance, name, value, self)
 		end
 	end
 end
@@ -242,7 +242,7 @@ local function update(delta)
 					local isModel = realInstance.ClassName == "Model"
 					
 					for name, value in props do
-						track:_applyPropValue(realInstance, name, value, isModel)
+						ApplyProp(realInstance, name, value, track)
 					end
 				else
 					warn("failed to play track, unknown instance", instanceId)
