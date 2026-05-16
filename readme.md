@@ -63,7 +63,7 @@ Main methods:
 
 The compilation process should only be done once in studio before publishing to avoid having to store the entire MoonSave in game
 
-- use `Serializer.new(moonSave, compressionLevel?)` + `serializer:build()` to compile a MoonSave
+- use `Serializer.new(moonSave, flags?)` + `serializer:build()` to compile a MoonSave
 
 ```lua
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
