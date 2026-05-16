@@ -69,9 +69,15 @@ The compilation process should only be done once in studio before publishing to 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local MoonPlayer = require(ReplicatedStorage.Packages.MoonPlayer)
+
+local Serializer = MoonPlayer.Compiler.Serializer
+local Flags = MoonPlayer.Compiler.Flags
+
 local sourceSave = workspace.MoonSave
 
-local compiledTrack = MoonPlayer.Compiler.Serializer.new(sourceSave):Build()
+local flags = Flags.CompressionLevel(7) + Flags.CFrameSerializeMethod.Bytes
+local compiledTrack = MoonPlayer.Compiler.Serializer.new(sourceSave, flags):Build()
+
 compiledTrack.Name = "Wave"
 compiledTrack.Parent = ReplicatedStorage.Animations
 ```
