@@ -37,6 +37,7 @@ function Player.new(track, instanceOverrides)
 		FrameAdvance = {},
 		FrameState = {},
 		
+		MarkerSequence = {},
 		PartAttachments = {},
 
 		MarkerCallbacks = {},
@@ -58,10 +59,19 @@ function Player:Resume()
 end
 
 function Player:Play()
+	self:_buildMarkerSequence()
 	self:_restore()
 	self:_advance()
 	
 	PlayingTracks[self] = true
+end
+
+function Player:SetDuration(duration)
+    local originalFrameRate = self.Data.Information.FrameRate or 60
+    local originalLength = self.Data.Information.Length
+    local originalDuration = originalLength / originalFrameRate
+
+    self.FrameRate = originalFrameRate * (originalDuration / duration)
 end
 
 function Player:ReplaceInstance(original, new)
@@ -81,12 +91,25 @@ function Player:OnFrameReached(frame, callback)
 	self.FrameCallbacks[tostring(frame)] = callback
 end
 
+function Player:_buildMarkerSequence()
+	local sequence = {}
+
+	for frameId in self.Deserializer.markers do
+		table.insert(sequence, tonumber(frameId))
+	end
+
+	table.sort(sequence)
+	self.MarkerSequence = {}
+end
+
+
 function Player:_restore()
 	self.Reader = SequentialReader.new(self.Deserializer)	
 
 	self.PartAttachments = {}
 	self.FrameState = {}
 	self.FrameAdvance = {}
+	self.MarkerSequence = {}
 
 	self.CurrentAdvance = 0
 	self.CurrentFrame = -1
@@ -179,6 +202,36 @@ function Player:_advance()
 	end
 end
 
+local function emitMarkers(track, frameId)
+	local markers = track.Deserializer.markers[frameId]
+	if not markers then
+		return 
+	end
+
+	local instanceOverride = track.Deserializer.targetOverrides
+	local instances = track.Deserializer.targets
+
+	for markerType, markers in markers do
+		for instanceId, markerList in markers do
+			local realInstance = instanceOverride[instanceId] 
+				or instances[instanceId]
+			
+			for marker, kfMarkers in markerList do
+				local callback = track.MarkerCallbacks[marker]
+				
+				if callback then
+					task.spawn(
+						callback,
+						realInstance,
+						markerType == "finish",
+						kfMarkers
+					)
+				end
+			end
+		end
+	end
+end
+
 local function update(delta)
 	for track in PlayingTracks do
 		local currentFrame = math.floor(track.TimePosition * track.FrameRate)
@@ -203,7 +256,6 @@ local function update(delta)
 		local frameId = tostring(currentFrame)
 
 		local frame = track.FrameAdvance[frameId]
-		local markers = track.Deserializer.markers[frameId]
 
 		local frameCallback = track.FrameCallbacks[frameId]
 		if frameCallback then
@@ -232,27 +284,16 @@ local function update(delta)
 		for inst, attach in track.PartAttachments do
 			inst.CFrame = attach.CFrame
 		end
-		
-		if markers then
-			for markerType, markers in markers do
-				for instanceId, markerList in markers do
-					local realInstance = instanceOverride[instanceId] 
-						or instances[instanceId]
-					
-					for marker, kfMarkers in markerList do
-						local callback = track.MarkerCallbacks[marker]
-						
-						if callback then
-							task.spawn(
-								callback,
-								realInstance,
-								markerType == "finish",
-								kfMarkers
-							)
-						end
-					end
-				end
+	
+		while true do
+			local marker = track.MarkerSequence[1]
+
+			if typeof(marker) ~= "number" or currentFrame < marker then
+				break
 			end
+
+			emitMarkers(track, tostring(marker))
+			table.remove(track.MarkerSequence, 1)
 		end
 		
 		track.FrameAdvance[tostring(lastFrame)] = nil

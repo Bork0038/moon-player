@@ -4,23 +4,47 @@ local HttpService = game:GetService("HttpService")
 local ParseHierarchy = require("@self/Hierarchy")
 local Stream = require("./Stream")
 local Enums = require("./Enums")
+local Flags = require("./Flags")
 
 local PropertyType = Enums.PropertyType
 local Tree = script.tree
 
+local function packf16(v: number, min: number, max: number): number
+    return math.round((v - min) / (max - min) * 65535)
+end
+
+local function cfToQuat(cf: CFrame): (number, number, number, number)
+    local m = { cf:GetComponents() }
+    local trace = m[4] + m[8] + m[12]
+
+    local rw = math.sqrt(math.max(0, 1 + trace)) / 2
+    local rx = math.sqrt(math.max(0, 1 + m[4]  - m[8]  - m[12])) / 2
+    local ry = math.sqrt(math.max(0, 1 - m[4]  + m[8]  - m[12])) / 2
+    local rz = math.sqrt(math.max(0, 1 - m[4]  - m[8]  + m[12])) / 2
+
+    rx = math.sign(m[11] - m[9])  * rx
+    ry = math.sign(m[5]  - m[11]) * ry
+    rz = math.sign(m[9]  - m[5])  * rz
+
+    return rx, ry, rz, rw
+end
 
 local Serializer = {}
 
 
-function Serializer.new(save: StringValue, compressionLevel: number?)
+function Serializer.new(
+	save: StringValue, 
+	flags: Flags.Flags?
+)
 	local self = setmetatable({
 		save = save,
 		data = HttpService:JSONDecode(save.Value),
-        compressionLevel = compressionLevel or 15,
+		flags = flags or Flags + {},
 		
 		tree = Tree:Clone(),
 		realValues = {},
 		
+		cframeDuplicates = 0,
 		compressionDictionaries = {
 			strings = { count = 0, data = {} },
 			cframes = { count = 0, data = {} },
@@ -29,11 +53,44 @@ function Serializer.new(save: StringValue, compressionLevel: number?)
 		}
 	}, { __index = Serializer })
 	
+	self.data.Information.Flags = self.flags
 
 	self:tagInstances()
 	self:initHierarchy()	
 	
 	return self 
+end
+
+function Serializer:writeCFrame(stream, cframe)
+	local serializeMethod = self.flags.CFrameSerializeMethod
+
+	if serializeMethod == "Attributes" then
+		local id = self:fetchIdFromCompressionDictionary("cframes", tostring(cframe))
+		self.realValues[tostring(cframe)] = cframe
+
+		stream:writeu32(id)
+	elseif serializeMethod == "Bytes" or serializeMethod == "BytesLossy" then
+		local pos = cframe.Position
+		local rx, ry, rz, rw = cfToQuat(cframe)
+
+		if rw < 0 then 
+			rx, ry, rz = -rx, -ry, -rz 
+		end
+
+		stream:writef32(pos.X)
+		stream:writef32(pos.Y)
+		stream:writef32(pos.Z)
+
+		if serializeMethod == "Bytes" then
+			stream:writef32(rx)
+			stream:writef32(ry)
+			stream:writef32(rz)
+		else
+			stream:writeu16(packf16(rx, -1, 1))
+			stream:writeu16(packf16(ry, -1, 1))
+			stream:writeu16(packf16(rz, -1, 1))
+		end
+	end
 end
 
 function Serializer:writePropertyValueToStream(stream, value)
@@ -48,11 +105,8 @@ function Serializer:writePropertyValueToStream(stream, value)
 		stream:writeu8(PropertyType.String)
 		stream:writeu16(id)
 	elseif valueType == "CFrame" then
-		local id = self:fetchIdFromCompressionDictionary("cframes", tostring(value))
-		self.realValues[tostring(value)] = value
-
 		stream:writeu8(PropertyType.CFrame)
-		stream:writeu32(id)
+		self:writeCFrame(stream, value)
 	elseif valueType == "Instance" then
 		local id = self:fetchIdFromCompressionDictionary("objects", value)
 
@@ -99,7 +153,7 @@ function Serializer:encodeStream(stream)
 	local compressedBuffer = EncodingService:CompressBuffer(
 		stream:tobuffer(),
 		Enum.CompressionAlgorithm.Zstd,
-		self.compressionLevel
+		self.flags.CompressionLevel
 	)
 	
 	return buffer.tostring(
@@ -117,6 +171,10 @@ function Serializer:fetchIdFromCompressionDictionary(target, value)
 		targetDictionary.data[value] = existingId
 
 		targetDictionary.count += 1
+	else 
+		if target == "cframes" then
+			self.cframeDuplicates += 1
+		end
 	end
 
 	return existingId
@@ -153,11 +211,14 @@ function Serializer:Build()
 	self:buildDefaults()
 	
 	self:buildFrameBuffer()
-	self:buildCFrameRegistry()
 	self:buildDictBuffer()
+
+	if self.enableCFrameDictionary then
+		self:buildCFrameRegistry()
+	end
 	
 	self.tree.Value = HttpService:JSONEncode(self.data)
-	
+
 	return self.tree
 end
 
@@ -299,9 +360,6 @@ function Serializer:buildHierarchyStream()
 end
 
 function Serializer:buildCFrameRegistry()
-	local totalEntries = 0
-	local count = 0
-	
 	for cframe, id in self.compressionDictionaries.cframes.data do
 		local realCFrame = self.realValues[cframe]
 		local bucketIndex = math.floor(id / 1000)

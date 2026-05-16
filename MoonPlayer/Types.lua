@@ -1,16 +1,23 @@
+local Flags = require("./Compiler/Flags")
+
 export type Deserializer = {
 	new: (MoonSave: StringValue) -> Deserializer,
 }
 
 export type Serializer = {
-	new: (MoonSave: StringValue, CompressionLevel: number?) -> Serializer,
+	new: (
+		MoonSave: StringValue, 
+		Flags: Flags.Flags?
+	) -> Serializer,
 	
-	Build: (Serializer) -> StringValue
+	Build: (Serializer) -> StringValue,
 }
 
 export type Compiler = {
 	Deserializer: Deserializer,
-	Serializer: Serializer
+	Serializer: Serializer,
+
+	Flags: Flags.Flags
 }
 
 export type AnimationPlayer = {
@@ -22,6 +29,7 @@ export type AnimationPlayer = {
 	Play: (AnimationPlayer) -> (),
 	Stop: (AnimationPlayer) -> (),
 	Resume: (AnimationPlayer) -> (),
+	SetDuration: (AnimationPlayer, Duration: number) -> (),
 	
 	ReplaceInstance: (
 		AnimationPlayer, 

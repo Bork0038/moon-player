@@ -9,13 +9,20 @@ local PropertyType = Enums.PropertyType
 
 local MARKER_TYPES = { "finish", "start" } -- do not reorder these
 
+local function unpackf16(u: number, min: number, max: number): number
+    return u / 65535 * (max - min) + min
+end
+
 
 local Deserializer = {}
 
 function Deserializer.new(save, overrides)
+	local data = HttpService:JSONDecode(save.Value)
+
 	local self = setmetatable({
-		data = HttpService:JSONDecode(save.Value),
+		data = data,
 		save = save,
+		flags = data.Information.Flags,
 		
 		strings = {},
 		values = {},
@@ -26,7 +33,7 @@ function Deserializer.new(save, overrides)
 		targetOverrides = {},
 		
 		defaults = {},
-		
+
 		instanceOverrides = overrides or {},
 		
 		markers = {
@@ -94,9 +101,32 @@ function Deserializer:deserializeValue(stream)
 	local valueType = stream:readu8()
 
 	if valueType == PropertyType.CFrame then
-		local cframeId = stream:readu32()
-		
-		return self.cframes[math.floor(cframeId / 1000)]:GetAttribute(tostring(cframeId)), cframeId
+		local serializeMethod = self.flags.CFrameSerializeMethod
+
+		if serializeMethod == "Attributes" then
+			local cframeId = stream:readu32()
+			
+			return self.cframes[math.floor(cframeId / 1000)]:GetAttribute(tostring(cframeId)), cframeId
+		else 
+			local x = stream:readf32()
+			local y = stream:readf32()
+			local z = stream:readf32()
+
+			local rx, ry, rz
+			if serializeMethod == "Bytes" then
+				rx = stream:readf32()
+				ry = stream:readf32()
+				rz = stream:readf32()
+			elseif serializeMethod == "BytesLossy" then
+				rx = unpackf16(stream:readu16(), -1, 1)
+				ry = unpackf16(stream:readu16(), -1, 1)
+				rz = unpackf16(stream:readu16(), -1, 1)
+			end
+
+			local rw = math.sqrt(math.max(0, 1 - rx * rx - ry * ry - rz * rz))
+
+			return CFrame.new(x, y, z, rx, ry, rz, rw)
+		end
 	elseif valueType == PropertyType.String then
 		return self.strings[stream:readu16()]
 	elseif valueType == PropertyType.ObjectValue then
@@ -193,9 +223,8 @@ function Deserializer:deserializeMarkers()
 	for _, markerType in MARKER_TYPES do
 		for _ = 1, stream:readu16() do
 			local frameId = stream:readu16()
-			local insts = {}
-			
 			local frame = markers[tostring(frameId)]
+
 			if not frame then
 				frame = {}
 				markers[tostring(frameId)] = frame
