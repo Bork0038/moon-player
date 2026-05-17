@@ -99,7 +99,7 @@ function Player:_buildMarkerSequence()
 	end
 
 	table.sort(sequence)
-	self.MarkerSequence = {}
+	self.MarkerSequence = sequence
 end
 
 
