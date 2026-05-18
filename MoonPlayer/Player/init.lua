@@ -27,6 +27,7 @@ function Player.new(track, instanceOverrides)
 		Deserializer = Deserializer.new(track, instanceOverrides),
 		Reader = nil,
 
+		OriginalFrameRate = Data.Information.FrameRate or 60,
 		FrameRate = Data.Information.FrameRate or 60,
 		Length = Data.Information.Length,
 
@@ -68,7 +69,7 @@ function Player:Play()
 end
 
 function Player:SetDuration(duration)
-    local originalFrameRate = self.Data.Information.FrameRate or 60
+    local originalFrameRate = self.OriginalFrameRate
     local originalLength = self.Data.Information.Length
     local originalDuration = originalLength / originalFrameRate
 
@@ -76,7 +77,7 @@ function Player:SetDuration(duration)
 end
 
 function Player:ReplaceInstance(original, new)
-	return self.Deserialize:overrideInstance(original, new)
+	return self.Deserializer:overrideInstance(original, new)
 end
 
 
@@ -238,7 +239,7 @@ local function update(delta)
 		local currentFrame = math.floor(track.TimePosition * track.FrameRate)
 		local lastFrame = track.CurrentFrame
 
-		delta = math.min(delta, 1 / track.FrameRate)
+		delta = math.min(delta, 1 / track.OriginalFrameRate)
 
 		if currentFrame > track.Length then
 			for callback in track.FinishedCallbacks do
