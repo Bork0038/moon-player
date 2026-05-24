@@ -8,7 +8,8 @@ local Enums = {
 		ObjectValue = 0x05,
 		Value = 0x06,
 		Nil = 0x07,
-		Vector3 = 0x08
+		Vector3 = 0x08,
+		ColorSequence = 0x09
 	}
 }
 

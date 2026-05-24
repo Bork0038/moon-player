@@ -12,7 +12,7 @@ local MARKER_TYPES = { "finish", "start" } -- do not reorder these
 
 local Deserializer = {}
 
-function Deserializer.new(save, overrides)
+function Deserializer.new(save, flags)
 	local data = HttpService:JSONDecode(save.Value)
 
 	local self = setmetatable({
@@ -27,10 +27,13 @@ function Deserializer.new(save, overrides)
 		
 		targets = {},
 		targetOverrides = {},
+
+		unresolvedInstances = {},
 		
 		defaults = {},
 
-		instanceOverrides = overrides or {},
+		instanceOverrides = flags.InstanceOverrides or {},
+		playerFlags = flags,
 		
 		markers = {
 			finish = {},
@@ -123,7 +126,6 @@ function Deserializer:deserializeGenericValue(stream, valueType)
 	elseif valueType == PropertyType.Nil then
 		return nil
 	else 
-		warn(debug.traceback())
 		warn("unknown value type", valueType)
 	end
 end
@@ -147,6 +149,25 @@ function Deserializer:deserializeValue(stream)
 		return self.objects[stream:readu16()]
 	elseif valueType == PropertyType.Value then
 		return self.values[stream:readu16()]
+	elseif valueType == PropertyType.ColorSequence then
+		local keypoints = {}
+
+		for _ = 1, stream:readu8() do
+			local time = stream:readf16()
+			local color = Color3.new(
+				stream:readf32(), 
+				stream:readf32(), 
+				stream:readf32()
+			)
+
+			table.insert(keypoints, ColorSequenceKeypoint.new(time, color))
+		end
+
+		if #keypoints == 1 then
+			return ColorSequence.new(keypoints[1].Value)
+		else
+			return ColorSequence.new(keypoints)
+		end
 	end
 
 	return self:deserializeGenericValue(stream, valueType)
@@ -276,6 +297,18 @@ function Deserializer:deserializeMarkers()
 	self.markers = markers
 end
 
+function Deserializer:throwResolverError(path, identifier)
+	if self.playerFlags.StrictMode then
+		error(`failed to resolve "{path}"`)
+	end 
+
+	if self.playerFlags.LogUnresolvedInstances then
+		warn(`failed to resolve "{path}"`)
+	end 
+
+	table.insert(self.unresolvedInstances, identifier)
+end 
+
 function Deserializer:deserializeHierarchy()
 	local stream = self:decompressBuffer(self.save.hierarchy)
 	
@@ -283,35 +316,47 @@ function Deserializer:deserializeHierarchy()
 	for _, item in self.data.Items do
 		local concatPath = table.concat(item.Path.InstanceNames, ".")
 		local overridenInstance = self.instanceOverrides[concatPath]
+		local identifier = tostring(item.Identifier)
 		
 		if not overridenInstance then
 			overridenInstance = Resolver.resolveAnimPath(item.Path)
-			
-			if not overridenInstance then
-				warn("failed to resolve", item.Path)
-			end
+		end
+
+		if not overridenInstance then
+			self:throwResolverError(concatPath, identifier)
 		end
 		
-		targets[tostring(item.Identifier)] = overridenInstance
+		targets[identifier] = overridenInstance
 	end
 	
 	for _ = 1, stream:readu16() do
 		local rootId = stream:readu16()
-		local root = assert(targets[tostring(rootId)])
-		
+		local root = targets[tostring(rootId)]
+
 		local jointCount = stream:readu16()
 		if jointCount > 0 then 
-			local jointsHier, findJointSmart = Resolver.resolveJoints(root)
+			local jointsHier, findSmartJoint
+
+			if root then
+				jointsHier, findJointSmart = Resolver.resolveJoints(root)
+			end
 			
 			for _ = 1, jointCount do
 				local jointId = stream:readu16()
 				local hier = stream:readstring(16)
+				local jointIdentifier = tostring(jointId)
+
+				if not root then
+					self:throwResolverError(hier, jointIdentifier)
+					continue
+				end
+		
 				local jointData = jointsHier[hier] or (findJointSmart and findJointSmart(hier)) or nil
-				
+
 				if jointData and jointData.Joint then
-					targets[tostring(jointId)] = jointData.Joint
+					targets[jointIdentifier] = jointData.Joint
 				else 
-					warn("failed to resolve joint", hier)
+					self:throwResolverError(hier, jointIdentifier)
 				end
 			end
 		end

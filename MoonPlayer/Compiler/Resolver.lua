@@ -43,7 +43,6 @@ local function resolveAnimPath(path: MoonAnimPath?, root: Instance?): Instance?
 		return data
 	end
 
-	warn("!! PATH RESOLVE FAILED:", table.concat(path.InstanceNames, "."))
 	return nil
 end
 

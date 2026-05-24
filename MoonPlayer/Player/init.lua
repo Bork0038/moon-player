@@ -1,4 +1,3 @@
-local FRAME_ADVANCE = 30
 local FRAME_ADVANCE_HZ = Enum.StepFrequency.Hz30
 
 
@@ -9,6 +8,7 @@ local Interpolator = require("./Interpolator")
 local ApplyProp = require("@self/ApplyProp")
 local EaseFuncs = require("./EaseFuncs")
 local Compiler = require("./Compiler")
+local Flags = require("./Flags")
 
 local SequentialReader = Compiler.SequentialReader
 local Deserializer = Compiler.Deserializer
@@ -19,12 +19,17 @@ local IGNORED_DEFAULTS = { "Emit" }
 local Player = {}
 
 
-function Player.new(track, instanceOverrides)
+function Player.new(track, flags)
 	local Data = HttpService:JSONDecode(track.Value)
+	local playerFlags = Flags.Player.Default
+
+	if flags then
+		playerFlags += flags
+	end
 
 	local self = setmetatable({
 		Data = Data,
-		Deserializer = Deserializer.new(track, instanceOverrides),
+		Deserializer = Deserializer.new(track, playerFlags),
 		Reader = nil,
 
 		OriginalFrameRate = Data.Information.FrameRate or 60,
@@ -43,12 +48,15 @@ function Player.new(track, instanceOverrides)
 
 		MarkerCallbacks = {},
 		FinishedCallbacks = {},
-		FrameCallbacks = {}
+		FrameCallbacks = {},
+
+		Flags = playerFlags,
 	}, { __index = Player })
+
+	self:_handleBaseFlags()
 
 	return self
 end
-
 
 function Player:Stop()
 	PlayingTracks[self] = nil
@@ -124,6 +132,18 @@ function Player:_restore()
 		local realInstance = instanceOverride[instanceId] 
 			or instances[instanceId]
 		
+		if not realInstance then
+			if self.Flags.StrictMode then
+				return error(`failed to restore track to default instance "{instanceId}" is missing`)
+			end
+
+			if self.Flags.LogUnresolvedInstances then
+				warn(`failed to resolve instance: "{instanceId}"`)
+			end
+
+			continue
+		end 
+
 		for name, value in props do 
 			if table.find(IGNORED_DEFAULTS, name) then
 				continue
@@ -134,13 +154,20 @@ function Player:_restore()
 	end
 end
 
+function Player:_handleBaseFlags()
+	local flags = self.Flags 
+
+	if flags.Duration ~= -1 then
+		self:SetDuration(flags.Duration)
+	end
+end
 
 function Player:_advance()
 	local state = self.FrameState
 	local advance = self.FrameAdvance 
 	local reader = self.Reader
 
-	while self.CurrentAdvance ~= self.CurrentFrame + FRAME_ADVANCE do
+	while self.CurrentAdvance ~= self.CurrentFrame + self.Flags.FrameAdvance do
 		local currentFrame = self.CurrentAdvance
 
 		local newPoints = reader:requestFrame()
@@ -169,6 +196,10 @@ function Player:_advance()
 
 		local frameBuffer = {}
 		for instanceId, props in state do 
+			if table.find(self.Deserializer.unresolvedInstances, instanceId) then
+				continue
+			end 
+			
 			local instanceEntry = {}
 
 			for name, valueData in props do
@@ -306,7 +337,7 @@ end
 
 local function framePregen(delta)
 	for track in PlayingTracks do
-		if track.CurrentAdvance == track.CurrentFrame + FRAME_ADVANCE then
+		if track.CurrentAdvance == track.CurrentFrame + track.Flags.FrameAdvance then
 			continue
 		end
 

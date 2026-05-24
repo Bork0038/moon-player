@@ -1,6 +1,45 @@
 local Resolver = require("../Resolver")
 local StaticProps = require("../../StaticProps")
 
+local VALUE_HANDLERS = {
+	EnumType = function(inst, baseValue)
+		return Enum[inst.Value][baseValue]
+	end,
+
+	Vector2 = function(inst, baseValue)
+		return Vector2.new(baseValue.X, baseValue.Y)
+	end,
+
+	ColorSequence = function(inst, baseValue)
+		return ColorSequence.new(baseValue)
+	end,
+
+	NumberSequence = function(inst, baseValue)
+		return NumberSequence.new(baseValue)
+	end,
+
+	NumberRange = function(inst, baseValue)
+		return NumberRange.new(baseValue)
+	end
+}
+
+local function readValue(value)
+	if not value:IsA("ValueBase") then
+		return value:GetAttribute("Value")
+	end
+
+	local baseValue = value.Value
+	for name, handler in VALUE_HANDLERS do
+		local inst = value:FindFirstChild(name)
+
+		if inst then
+			return handler(inst, baseValue)
+		end
+	end
+
+	return baseValue
+end
+
 local function parseKeyframes(keyframes, instance)
 	local packs = keyframes:QueryDescendants(">Folder")
 	local idx = {}
@@ -29,7 +68,7 @@ local function parseKeyframes(keyframes, instance)
 			local frame = values[tostring(i)]
 			local frameTime = startTime + i
 			local lastFrame = frames[#frames]
-			local value = frame.Value
+			local value = readValue(frame)
 			
 			local isStatic = StaticProps[instance.ClassName]
 				and StaticProps[instance.ClassName][keyframes.Name]
@@ -56,7 +95,7 @@ local function parseKeyframes(keyframes, instance)
 
 					if easeParams then
 						for _, child in easeParams:GetChildren() do
-							params[child.Name] = child.Value
+							params[child.Name] = readValue(child)
 						end
 					end
 
@@ -216,7 +255,7 @@ local function ParseHierarchy(data, save)
 						defaults[tostring(identifier)] = instDefaults
 					end
 					
-					instDefaults[child.Name] = default.Value
+					instDefaults[child.Name] = readValue(default)
 				end
 				
 				for _, keyframe in parseKeyframes(child, realInstance) do

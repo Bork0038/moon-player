@@ -1,29 +1,24 @@
-local Flags = require("./Compiler/Flags")
-
-export type Deserializer = {
-	new: (MoonSave: StringValue) -> Deserializer,
-}
+local Flags = require("./Flags")
 
 export type Serializer = {
 	new: (
 		MoonSave: StringValue, 
-		Flags: Flags.Flags?
+		Flags: Flags.SerializerFlags?
 	) -> Serializer,
 	
 	Build: (Serializer) -> StringValue,
 }
 
 export type Compiler = {
-	Deserializer: Deserializer,
 	Serializer: Serializer,
 
-	Flags: Flags.Flags
+	Flags: Flags.SerializerFlags
 }
 
 export type AnimationPlayer = {
 	new: (
 		MoonSave: StringValue, 
-		Overrides: { [string]: Instance }?
+		Flags: Flags.PlayerFlags
 	) -> AnimationPlayer,
 	
 	Play: (AnimationPlayer) -> (),

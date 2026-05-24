@@ -4,7 +4,7 @@ local HttpService = game:GetService("HttpService")
 local ParseHierarchy = require("@self/Hierarchy")
 local Stream = require("./Stream")
 local Enums = require("./Enums")
-local Flags = require("./Flags")
+local Flags = require("../Flags")
 
 local PropertyType = Enums.PropertyType
 local Tree = script.tree
@@ -14,12 +14,12 @@ local Serializer = {}
 
 function Serializer.new(
 	save: StringValue, 
-	flags: Flags.Flags?
+	flags: Flags.Flag?
 )
 	local self = setmetatable({
 		save = save,
 		data = HttpService:JSONDecode(save.Value),
-		flags = flags and Flags.Default + flags or Flags.Default,
+		flags = flags and Flags.Serializer.Default + flags or Flags.Serializer.Default,
 		
 		tree = Tree:Clone(),
 		realValues = {},
@@ -79,7 +79,33 @@ function Serializer:writePropertyValueToStream(stream, value)
 
 		stream:writeu8(PropertyType.Value)
 		stream:writeu16(id)
-	else
+	elseif valueType == "ColorSequence" then
+		stream:writeu8(PropertyType.ColorSequence)
+
+		local keypoints = value.Keypoints
+		
+		if #keypoints == 2 and keypoints[1].Value == keypoints[2].Value then
+			local color = keypoints[1].Value
+
+			stream:writeu8(1)
+			stream:writef16(0)
+
+			stream:writef32(color.R)
+			stream:writef32(color.G)
+			stream:writef32(color.B)
+		else 
+			stream:writeu8(#keypoints)
+
+			for _, keypoint  in keypoints do
+				stream:writef16(keypoint.Time)
+
+				local color = keypoint.Value
+				stream:writef32(color.R)
+				stream:writef32(color.G)
+				stream:writef32(color.B)
+			end
+		end
+	else 
 		warn("invalid type", valueType, value)
 	end
 end
