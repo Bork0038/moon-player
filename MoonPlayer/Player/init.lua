@@ -270,7 +270,7 @@ local function update(delta)
 	for track in PlayingTracks do
 		local currentFrame = math.floor(track.TimePosition * track.FrameRate)
 		local lastFrame = track.CurrentFrame
-
+		
 		delta = math.min(delta, 1 / track.OriginalFrameRate)
 
 		if currentFrame > track.Length then
@@ -345,7 +345,7 @@ local function framePregen(delta)
 	end
 end
 
-RunService:BindToRenderStep("UPDATE_MOON", Enum.RenderPriority.Camera.Value, update)
+RunService:BindToRenderStep("UPDATE_MOON", Enum.RenderPriority.Camera.Value + 1, update)
 RunService:BindToSimulation(framePregen, FRAME_ADVANCE_HZ, Enum.RenderPriority.Last.Value + 2)
 
 

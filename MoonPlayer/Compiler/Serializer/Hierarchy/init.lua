@@ -1,5 +1,6 @@
 local Resolver = require("../Resolver")
 local StaticProps = require("../../StaticProps")
+local EQ = require("@self/EQ")
 
 local VALUE_HANDLERS = {
 	EnumType = function(inst, baseValue)
@@ -64,6 +65,8 @@ local function parseKeyframes(keyframes, instance)
 		
 		table.sort(sortedPack)
 		
+        local easeFinished = false
+
 		for _, i in sortedPack do
 			local frame = values[tostring(i)]
 			local frameTime = startTime + i
@@ -73,15 +76,6 @@ local function parseKeyframes(keyframes, instance)
 			local isStatic = StaticProps[instance.ClassName]
 				and StaticProps[instance.ClassName][keyframes.Name]
 			
-			local diff = frameTime - (lastFrame and lastFrame.startTime or frameTime)
-			if diff > 1 and (lastFrame and not lastFrame.static) and not isStatic then
-				lastFrame.count = diff
-
-				if lastFrame.ease then
-					lastFrame.ease.target = value
-				end
-			end
-
 			local easeData
 
 			if eases then
@@ -107,6 +101,22 @@ local function parseKeyframes(keyframes, instance)
 				end
 			end
 
+            local diff = frameTime - (lastFrame and lastFrame.startTime or frameTime)
+
+            if lastFrame and lastFrame.ease and diff > 1 then
+                lastFrame.count += diff
+                lastFrame.ease.target = value
+
+                easeFinished = true
+                continue
+            end
+			
+            if lastFrame and not lastFrame.static and not isStatic and diff > 1 and not easeFinished and EQ(value, lastFrame.value) then
+                lastFrame.count += diff
+                continue
+            end
+			
+			easeFinished = false
 			table.insert(frames, {
 				startTime = frameTime,
 				value =  value,
@@ -192,7 +202,7 @@ local function ParseHierarchy(data, save)
 				local keyframes = joint:FindFirstChild("_keyframes")
 
 				if default then
-					default = default.Value
+					default = readValue(default)
 					
 					defaults[tostring(jointId)] = {
 						Transform = default
@@ -206,15 +216,17 @@ local function ParseHierarchy(data, save)
 					end
 					
 					local isMotor6D = joint.Joint:IsA("Motor6D")
-					for _, keyframe in parseKeyframes(keyframes, realInstance) do
+					for _, keyframe in parseKeyframes(keyframes, joint.Joint) do
+						local value = keyframe.value
 						local frameData = frameBuffer[tostring(keyframe.startTime)]
+						
 						if not frameData then
 							frameData = {}
 							frameBuffer[tostring(keyframe.startTime)] = frameData
 						end
 						
 						if isMotor6D then
-							keyframe.value = keyframe.value:Inverse() * default
+							value = value:Inverse() * default
 
 							if keyframe.ease then
 								keyframe.ease.target = keyframe.ease.target:Inverse() * default
@@ -225,7 +237,7 @@ local function ParseHierarchy(data, save)
 							{
 								props = {
 									Transform = {
-										value = keyframe.value,
+										value = value,
 										ease = keyframe.ease,
 									}
 								},
