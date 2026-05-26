@@ -49,6 +49,7 @@ function Player.new(track, flags)
 		MarkerCallbacks = {},
 		FinishedCallbacks = {},
 		FrameCallbacks = {},
+		ClassNames = {},
 
 		Flags = playerFlags,
 	}, { __index = Player })
@@ -72,6 +73,7 @@ function Player:Play()
 
 	self:_buildMarkerSequence()
 	self:_advance()
+	self:_setClassNames()
 	
 	PlayingTracks[self] = true
 end
@@ -120,6 +122,7 @@ function Player:_restore()
 	self.FrameState = {}
 	self.FrameAdvance = {}
 	self.MarkerSequence = {}
+	self.ClassNames = {}
 
 	self.CurrentAdvance = 0
 	self.CurrentFrame = -1
@@ -149,9 +152,26 @@ function Player:_restore()
 				continue
 			end
 
-			ApplyProp(realInstance, name, value, self)
+			ApplyProp(realInstance, realInstance.ClassName, name, value, self)
 		end
 	end
+end
+
+function Player:_setClassNames()
+	local classNames = {}
+
+	local instanceOverride = self.Deserializer.targetOverrides
+	local instances = self.Deserializer.targets
+
+	for id, instance in instances do
+		classNames[id] = instance.ClassName
+	end
+
+	for id, instance in instanceOverride do
+		classNames[id] = instance.ClassName
+	end
+
+	self.ClassNames = classNames
 end
 
 function Player:_handleBaseFlags()
@@ -291,6 +311,7 @@ local function update(delta)
 		local frame = track.FrameAdvance[frameId]
 
 		local instanceOverride = track.Deserializer.targetOverrides
+		local classNames = track.ClassNames
 		local instances = track.Deserializer.targets
 		
 		if frame then			
@@ -300,7 +321,13 @@ local function update(delta)
 
 				if realInstance then
 					for name, value in props do
-						ApplyProp(realInstance, name, value, track)
+						ApplyProp(
+							realInstance, 
+							classNames[instanceId],
+							name, 
+							value, 
+							track
+						)
 					end
 				else
 					warn("failed to play track, unknown instance", instanceId)
@@ -351,7 +378,7 @@ local function framePregen(delta)
 end
 
 RunService.PreAnimation:Connect(update)
-RunService.PreSimulation:Connect(updateAttachments)
+RunService:BindToRenderStep("UPDATE_MOON_ATTACHMENTS", Enum.RenderPriority.Camera.Value + 1, updateAttachments)
 RunService:BindToSimulation(framePregen, FRAME_ADVANCE_HZ, Enum.RenderPriority.Last.Value)
 
 return Player

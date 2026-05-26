@@ -27,8 +27,8 @@ local SpecialProps do
 	}
 end
 
-local function ApplyProp(inst, name, value, player)
-	local className = inst.ClassName
+local function ApplyProp(inst, className, name, value, player)
+	local className = className or inst.ClassName
 	local specialClass = SpecialProps[className]
 
 	if not specialClass then
