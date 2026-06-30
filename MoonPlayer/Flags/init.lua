@@ -18,6 +18,7 @@ export type PlayerFlags = {
 export type SerializerFlags = {
     CompressionLevel: (number) -> FlagBase.Flag,
     DisableRuntimeLengthEncoding: FlagBase.Flag,
+    EnableRelativeCFrameOffset: FlagBase.Flag,
 
     CFrameSerializeMethod: {
         Attributes: boolean,
