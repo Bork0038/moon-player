@@ -10,7 +10,7 @@ local CONSTANT_INTERPS = {
 local function lerp(a: any, b: any, t: number): any
 	if type(a) == "number" then
 		assert(type(b) == "number")
-		return a + ((b - a) * t)
+		return math.lerp(a, b, t)
 	else
 		return (a :: any):Lerp(b, t)
 	end
