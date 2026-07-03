@@ -31,10 +31,10 @@ key is the dot-path of an animated instance and the value is the instance to use
 An override **cascades**: everything underneath the overridden instance — descendant items,
 rig joints, and `ObjectValue` references — is resolved relative to the new instance.
 
-```lua
-local Flags = MoonPlayer.Flags.Player
+```luau
+const Flags = MoonPlayer.Flags.Player
 
-local player = MoonPlayer.Player.new(track, Flags.InstanceOverrides({
+const player = MoonPlayer.Player.new(track, Flags.InstanceOverrides({
 	["Workspace.Dummy"] = workspace.OtherDummy,
 }))
 ```
@@ -44,39 +44,41 @@ where `original` is an Instance or its dot-path. Call it before `Play()`.
 
 Example:
 
-```lua
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+```luau
+const ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local MoonPlayer = require(ReplicatedStorage.MoonPlayer)
-local track = ReplicatedStorage.Animations.Wave
+const MoonPlayer = require(ReplicatedStorage.MoonPlayer)
+const track = ReplicatedStorage.Animations.Wave
 
-local player = MoonPlayer.Player.new(track, MoonPlayer.Flags.Player.InstanceOverrides({
+const player = MoonPlayer.Player.new(track, MoonPlayer.Flags.Player.InstanceOverrides({
 	["Workspace.Dummy"] = workspace.Dummy,
 }))
 
-player:OnMarkerReached("Footstep", function(target, isFinished, kfMarkers)
+player:GetMarkerReachedSignal("Footstep"):Connect(function(target, isFinished, kfMarkers)
 	print("marker", target, isFinished)
 end)
 
-player:OnFinished(function()
+player.Finished:Connect(function()
 	print("finished")
 end)
 
-player:OnFrameReached(100, function()
+player:GetFrameReachedSignal(100):Connect(function()
 	print("frame 100 reached")
 end)
 
 player:Play()
 ```
 
-Main methods:
+Main methods/signals:
 
 - `Play()` rewinds the track, restores default values, and starts playback.
 - `Stop()` stops playback and restores defaults.
 - `Resume()` continues playback without rewinding.
-- `OnFinished(callback)` runs the callback when the track ends.
-- `OnMarkerReached(name, callback)` runs `callback(targetInstance, isFinishedMarker, kfmarkers)` when a named marker is reached.
-- `OnFrameReached(frame, callback)` runs `callback()` when a target frame has been reached
+- `Destroy()` removes the track from playback and destroys the player's signals; call it when you're done with a player.
+- `Finished` is a signal fired when the track ends: `player.Finished:Connect(callback)`.
+- `GetMarkerReachedSignal(name)` returns a signal fired with `(targetInstance, isFinishedMarker, kfmarkers)` when the named marker is reached.
+- `GetFrameReachedSignal(frame)` returns a signal fired when the target frame has been reached.
+- `OnFinished(callback)` / `OnMarkerReached(name, callback)` / `OnFrameReached(frame, callback)` are callback shorthands that connect to the corresponding signal and return the `RBXScriptConnection`.
 - `ReplaceInstance(original, new)` remaps `original` (an Instance or dot-path) to `new`, cascading to descendants, joints, and object references. Call before `Play()`.
 
 ## Compiling a Track
@@ -85,18 +87,18 @@ The compilation process should only be done once in studio before publishing to 
 
 - use `Serializer.new(moonSave, flags?)` + `serializer:build()` to compile a MoonSave
 
-```lua
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+```luau
+const ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local MoonPlayer = require(ReplicatedStorage.Packages.MoonPlayer)
+const MoonPlayer = require(ReplicatedStorage.Packages.MoonPlayer)
 
-local Serializer = MoonPlayer.Compiler.Serializer
-local Flags = MoonPlayer.Compiler.Flags
+const Serializer = MoonPlayer.Compiler.Serializer
+const Flags = MoonPlayer.Compiler.Flags
 
-local sourceSave = workspace.MoonSave
+const sourceSave = workspace.MoonSave
 
-local flags = Flags.CompressionLevel(7) + Flags.CFrameSerializeMethod.Bytes("F32", "F16")
-local compiledTrack = MoonPlayer.Compiler.Serializer.new(sourceSave, flags):Build()
+const flags = Flags.CompressionLevel(7) + Flags.CFrameSerializeMethod.Bytes("F32", "F16")
+const compiledTrack = MoonPlayer.Compiler.Serializer.new(sourceSave, flags):Build()
 
 compiledTrack.Name = "Wave"
 compiledTrack.Parent = ReplicatedStorage.Animations

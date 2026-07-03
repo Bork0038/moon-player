@@ -1,14 +1,16 @@
-local Stream = require("./Stream")
+--!optimize 2
+const LogService = game:GetService("LogService")
 
+const Stream = require("./Stream")
 
-local Reader = {}
+const Reader = {}
 
-function Reader.new(deserializer)
-	local frameBuffer = Stream.new(
+function Reader.new(deserializer: any)
+	const frameBuffer = Stream.new(
 		deserializer.frameBuffer:tobuffer()
 	)
 	
-	local self = setmetatable({
+	const self = setmetatable({
 		currentFrame = -1,
 		sequence = table.clone(deserializer.sequence),
 		deserializer = deserializer,
@@ -22,46 +24,46 @@ function Reader.new(deserializer)
 end
 
 function Reader:processNextFrame()
-	local stream = self.frameBuffer 
-	local nextFrame = stream:readu16()
+	const stream = self.frameBuffer 
+	const nextFrame = stream:readu16()
 	
 	if nextFrame ~= self.currentFrame then
 		stream.read -= 2 
-		warn("expected frame", self.currentFrame, "got", nextFrame)
+		LogService:Warn("[MoonPlayer/Compiler/SequentialReader]: expected frame {expected}, got {got}", {expected = self.currentFrame, got = nextFrame})
 		
 		return
 	end
 	
-	local frame = {}
+	const frame = {}
 	for _ = 1, stream:readu16() do
-		local instanceId = stream:readu16()
-		local props = {}
+		const instanceId = stream:readu16()
+		const props = {}
 		
 		for _ = 1, stream:readu16() do
-			local propList = {
+			const propList = {
 				duration = stream:readu16(),
 				props = {}
 			}
 			
 			for _ = 1, stream:readu8() do
-				local name = assert(self.deserializer.strings[stream:readu16()])
-				local value = self.deserializer:deserializeValue(stream)
+				const name = assert(self.deserializer.strings[stream:readu16()])
+				const value = self.deserializer:deserializeValue(stream)
 				
-				local prop = {
+				const prop = {
 					name = name,
 					value = value
 				}
 				
 				if stream:readbool() then
-					local easeType = assert(self.deserializer.strings[stream:readu16()])
-					local target = self.deserializer:deserializeValue(stream)
+					const easeType = assert(self.deserializer.strings[stream:readu16()])
+					const target = self.deserializer:deserializeValue(stream)
 					
-					local params = {}
+					const params = {}
 					for _ = 1, stream:readu8() do
-						local key = assert(self.deserializer.strings[stream:readu16()])
-						local value = self.deserializer:deserializeValue(stream) 
-						
-						params[key] = value
+						const key = assert(self.deserializer.strings[stream:readu16()])
+						const paramValue = self.deserializer:deserializeValue(stream)
+
+						params[key] = paramValue
 					end
 					
 					prop.ease = {
@@ -90,7 +92,7 @@ function Reader:requestFrame()
 	
 	self.currentFrame += 1
 
-	local nextFrame = self.sequence[1]
+	const nextFrame = self.sequence[1]
 	if nextFrame == self.currentFrame then
 		table.remove(self.sequence, 1)
 		

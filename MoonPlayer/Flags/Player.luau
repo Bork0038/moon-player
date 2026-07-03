@@ -1,6 +1,7 @@
-local FlagBase = require("./FlagBase")
+--!optimize 2
+const FlagBase = require("./FlagBase")
 
-local Flags = {
+const Flags = {
     DisableStrictMode = { StrictMode = false },
     LogUnresolvedInstances = { LogUnresolvedInstances = true },
 
@@ -11,7 +12,7 @@ local Flags = {
     InstanceExclusions = FlagBase.CreateCallFlag("InstanceExclusions", {})
 }
 
-local Default = {
+const Default = {
     StrictMode = true,
     LogUnresolvedInstances = false,
     

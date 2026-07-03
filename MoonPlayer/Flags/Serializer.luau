@@ -1,6 +1,7 @@
-local FlagBase = require("./FlagBase")
+--!optimize 2
+const FlagBase = require("./FlagBase")
 
-local Flags = {
+const Flags = {
     CompressionLevel = FlagBase.CreateCallFlag("CompressionLevel", 7),
     DisableRuntimeLengthEncoding = { RuntimeLengthEncoding = false },
     EnableRelativeCFrameOffset = { RelativeCFrameOffset = true },
@@ -12,7 +13,7 @@ local Flags = {
             CFramePosSizeT = 4, 
         },
 
-        Bytes = function(posT, rotT)
+        Bytes = function(posT: string, rotT: string): { [string]: any }
             return { 
                 CFrameSerializeMethod = "Bytes", 
                 CFramePosSizeT = (tonumber(posT:sub(2)) or 32) / 8,
@@ -22,7 +23,7 @@ local Flags = {
     }),
 }
 
-local Default = {
+const Default = {
     RuntimeLengthEncoding = true,
     RelativeCFrameOffset = false,
     CompressionLevel = 7,

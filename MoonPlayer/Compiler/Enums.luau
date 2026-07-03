@@ -1,4 +1,5 @@
-local Enums = {
+--!optimize 2
+const Enums = {
 	PropertyType = {
 		Bool = 0x00,
 		CFrame = 0x01,

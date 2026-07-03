@@ -1,11 +1,12 @@
+--!optimize 2
 local SpecialProps do
-	local ModelInstance = Instance.new("Model")
-	local ParticleEmitterInstance = Instance.new("ParticleEmitter")
+	const ModelInstance = Instance.new("Model")
+	const ParticleEmitterInstance = Instance.new("ParticleEmitter")
 
 	SpecialProps = {
 		Camera = {
 			Advanced = {
-				AttachToPart = function(inst, value, player)
+				AttachToPart = function(inst: Camera, value: BasePart, player: any): ()
 					player.PartAttachments[inst] = value
 				end
 			}
@@ -13,7 +14,7 @@ local SpecialProps do
 
 		Motor6D = {
 			Simple = {
-				Transform = function(inst, value)
+				Transform = function(inst: Motor6D, value: CFrame): ()
 					inst.Transform = value * inst.C1
 				end
 			}
@@ -35,9 +36,10 @@ local SpecialProps do
 	}
 end
 
-local function ApplyProp(inst, className, name, value, player)
-	local className = className or inst.ClassName
-	local specialClass = SpecialProps[className]
+const function ApplyProp(inst: Instance, className: string?, name: string, value: any, player: any)
+	className = className or inst.ClassName
+
+	const specialClass = SpecialProps[className]
 
 	if not specialClass then
 		inst[name] = value
@@ -45,7 +47,7 @@ local function ApplyProp(inst, className, name, value, player)
 	end
 
 	if specialClass.Simple then
-		local simpleHandler = specialClass.Simple[name]
+		const simpleHandler = specialClass.Simple[name]
 
 		if simpleHandler then
 			return simpleHandler(inst, value)
@@ -53,7 +55,7 @@ local function ApplyProp(inst, className, name, value, player)
 	end
 
 	if specialClass.Advanced then
-		local advancedHandler = specialClass.Advanced[name]
+		const advancedHandler = specialClass.Advanced[name]
 
 		if advancedHandler then
 			return advancedHandler(inst, value, player)
@@ -61,6 +63,8 @@ local function ApplyProp(inst, className, name, value, player)
 	end
 
 	inst[name] = value
+
+	return nil
 end
 
 return ApplyProp

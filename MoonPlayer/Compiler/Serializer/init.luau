@@ -1,23 +1,26 @@
-local EncodingService = game:GetService("EncodingService")
-local HttpService = game:GetService("HttpService")
+--!optimize 2
+const EncodingService = game:GetService("EncodingService")
+const HttpService = game:GetService("HttpService")
+const LogService = game:GetService("LogService")
 
-local ParseHierarchy = require("@self/Hierarchy")
-local Resolver = require("./Resolver")
-local Stream = require("./Stream")
-local Enums = require("./Enums")
-local Flags = require("../Flags")
+const ParseHierarchy = require("@self/Hierarchy")
+const Resolver = require("./Resolver")
+const Stream = require("./Stream")
+const Enums = require("./Enums")
+const Flags = require("../Flags")
+const Types = require("../Types")
 
-local PropertyType = Enums.PropertyType
-local Tree = script.tree
+const PropertyType = Enums.PropertyType
+const Tree = script.tree
 
-local Serializer = {}
+const Serializer = {}
 
 
 function Serializer.new(
 	save: StringValue, 
 	flags: Flags.Flag?
 )
-	local self = setmetatable({
+	const self = setmetatable({
 		save = save,
 		data = HttpService:JSONDecode(save.Value),
 		flags = flags and Flags.Serializer.Default + flags or Flags.Serializer.Default,
@@ -43,11 +46,11 @@ function Serializer.new(
 	return self 
 end
 
-function Serializer:writeCFrame(stream, cframe)
-	local serializeMethod = self.flags.CFrameSerializeMethod
+function Serializer:writeCFrame(stream: any, cframe: CFrame): ()
+	const serializeMethod = self.flags.CFrameSerializeMethod
 
 	if serializeMethod == "Attributes" then
-		local id = self:fetchIdFromCompressionDictionary("cframes", tostring(cframe))
+		const id = self:fetchIdFromCompressionDictionary("cframes", tostring(cframe))
 		self.realValues[tostring(cframe)] = cframe
 
 		stream:writeu32(id)
@@ -56,14 +59,14 @@ function Serializer:writeCFrame(stream, cframe)
 	end
 end
 
-function Serializer:writePropertyValueToStream(stream, value)
-	local valueType = typeof(value)
+function Serializer:writePropertyValueToStream(stream: any, value: any): ()
+	const valueType = typeof(value)
 
 	if valueType == "boolean" then
 		stream:writeu8(PropertyType.Bool)
 		stream:writebool(value)
 	elseif valueType == "string" then
-		local id = self:fetchIdFromCompressionDictionary("strings", value)
+		const id = self:fetchIdFromCompressionDictionary("strings", value)
 
 		stream:writeu8(PropertyType.String)
 		stream:writeu16(id)
@@ -71,12 +74,12 @@ function Serializer:writePropertyValueToStream(stream, value)
 		stream:writeu8(PropertyType.CFrame)
 		self:writeCFrame(stream, value)
 	elseif valueType == "Instance" then
-		local id = self:fetchIdFromCompressionDictionary("objects", value)
+		const id = self:fetchIdFromCompressionDictionary("objects", value)
 
 		stream:writeu8(PropertyType.ObjectValue)
 		stream:writeu16(id)
 	elseif valueType == "number" or valueType == "Color3" or valueType == "Vector3" then
-		local id = self:fetchIdFromCompressionDictionary("values", tostring(value))
+		const id = self:fetchIdFromCompressionDictionary("values", tostring(value))
 		self.realValues[tostring(value)] = value
 
 		stream:writeu8(PropertyType.Value)
@@ -84,7 +87,7 @@ function Serializer:writePropertyValueToStream(stream, value)
 	elseif valueType == "ColorSequence" then
 		stream:writeu8(PropertyType.ColorSequence)
 
-		local keypoints = value.Keypoints
+		const keypoints = value.Keypoints
 		
 		if #keypoints == 2 and keypoints[1].Value == keypoints[2].Value then
 			keypoints[2] = nil
@@ -95,7 +98,7 @@ function Serializer:writePropertyValueToStream(stream, value)
 		for _, keypoint  in keypoints do
 			stream:writef16(keypoint.Time)
 
-			local color = keypoint.Value
+			const color = keypoint.Value
 			stream:writef32(color.R)
 			stream:writef32(color.G)
 			stream:writef32(color.B)
@@ -103,7 +106,7 @@ function Serializer:writePropertyValueToStream(stream, value)
 	elseif valueType == "NumberSequence" then
 		stream:writeu8(PropertyType.NumberSequence)
 
-		local keypoints = value.Keypoints
+		const keypoints = value.Keypoints
 
 		if #keypoints == 2 and keypoints[1].Value == keypoints[2].Value and keypoints[1].Envelope == 0 then
 			keypoints[2] = nil
@@ -116,13 +119,16 @@ function Serializer:writePropertyValueToStream(stream, value)
 			stream:writef32(keypoint.Envelope)
 		end
 	else
-		print(debug.traceback())
-		warn("invalid type", valueType, value)
+		LogService:Warn("[MoonPlayer/Compiler/Serializer]: invalid type {valueType} for value {value}\n{traceback}", {
+			valueType = valueType,
+			value = value,
+			traceback = debug.traceback(),
+		})
 	end
 end
 
-function Serializer:writeValueToStream(stream, value)
-	local valueType = typeof(value)
+function Serializer:writeValueToStream(stream: any, value: any): ()
+	const valueType = typeof(value)
 
 	if valueType == "number" then
 		stream:writeu8(PropertyType.Number)
@@ -137,18 +143,18 @@ function Serializer:writeValueToStream(stream, value)
 		stream:writeu8(PropertyType.Vector3)
 		stream:writevector3(value)
 	else 
-		warn("unknown type", valueType)
+		LogService:Warn("[MoonPlayer/Compiler/Serializer]: unknown type {valueType}", {valueType = valueType})
 	end
 end
 
-function Serializer:writeStringId(stream, name)
+function Serializer:writeStringId(stream: any, name: string): ()
 	stream:writeu16(
 		self:fetchIdFromCompressionDictionary("strings", name)
 	)
 end
 
-function Serializer:encodeStream(stream)
-	local compressedBuffer = EncodingService:CompressBuffer(
+function Serializer:encodeStream(stream: any): string
+	const compressedBuffer = EncodingService:CompressBuffer(
 		stream:tobuffer(),
 		Enum.CompressionAlgorithm.Zstd,
 		self.flags.CompressionLevel
@@ -159,34 +165,34 @@ function Serializer:encodeStream(stream)
 	)
 end
 
-function Serializer:encodeStreamToParts(stream)
-	local compressedBuffer = EncodingService:CompressBuffer(
+function Serializer:encodeStreamToParts(stream: any): { StringValue }
+	const compressedBuffer = EncodingService:CompressBuffer(
 		stream:tobuffer(),
 		Enum.CompressionAlgorithm.Zstd,
 		self.flags.CompressionLevel
 	)
 
-	local buf = EncodingService:Base64Encode(compressedBuffer)
-	local totalSize = buffer.len(buf)
+	const buf = EncodingService:Base64Encode(compressedBuffer)
+	const totalSize = buffer.len(buf)
 
-	local chunkSize = 175 * 1024 
-	local chunks = table.create(math.ceil(totalSize / chunkSize))
+	const chunkSize = 175 * 1024 
+	const chunks = table.create(math.ceil(totalSize / chunkSize))
 
 	local offset = 0
 	while offset < totalSize do
-		local size = math.min(chunkSize, totalSize - offset)
+		const size = math.min(chunkSize, totalSize - offset)
 
-		local chunk = buffer.create(size)
+		const chunk = buffer.create(size)
 		buffer.copy(chunk, 0, buf, offset, size)
 
 		chunks[#chunks + 1] = chunk
 		offset += size
 	end
 
-	local out = {}
+	const out = {}
 
 	for i = 1, #chunks do
-		local value = Instance.new("StringValue")
+		const value = Instance.new("StringValue")
 		value.Value = buffer.tostring(chunks[i])
 		value.Name = tostring(i)
 
@@ -196,8 +202,8 @@ function Serializer:encodeStreamToParts(stream)
 	return out
 end
 
-function Serializer:fetchIdFromCompressionDictionary(target, value)
-	local targetDictionary = self.compressionDictionaries[target]
+function Serializer:fetchIdFromCompressionDictionary(target: string, value: any): number
+	const targetDictionary = self.compressionDictionaries[target]
 	local existingId = targetDictionary.data[value]
 
 	if not existingId then
@@ -214,8 +220,8 @@ function Serializer:fetchIdFromCompressionDictionary(target, value)
 	return existingId
 end
 
-function Serializer:initHierarchy()
-	local hierarchy = ParseHierarchy(
+function Serializer:initHierarchy(): ()
+	const hierarchy = ParseHierarchy(
 		self.data,
 		self.save,
 		not self.flags.RuntimeLengthEncoding,
@@ -229,7 +235,7 @@ function Serializer:initHierarchy()
 	self.defaults = hierarchy.defaults
 end
 
-function Serializer:tagInstances()
+function Serializer:tagInstances(): ()
 	local id = 1
 	
 	for _, item in self.data.Items do
@@ -245,7 +251,7 @@ end
 
 
 
-function Serializer:Build()
+function Serializer:Build(): Types.MoonSave
 	self:buildHierarchyStream()
 	self:buildMarkerBuffer()
 	self:buildDefaults()
@@ -263,8 +269,8 @@ function Serializer:Build()
 end
 
 
-function Serializer:buildDefaults()
-	local stream = Stream.new(nil, 512)
+function Serializer:buildDefaults(): ()
+	const stream = Stream.new(nil, 512)
 	
 	local count = 0 
 	
@@ -295,25 +301,25 @@ function Serializer:buildDefaults()
 	self.tree.defaults.Value = self:encodeStream(stream)
 end
 
-function Serializer:buildFrameBuffer()
-	local sequence = {}
+function Serializer:buildFrameBuffer(): ()
+	const sequence = {}
 	for id in self.frameBuffer do
 		table.insert(sequence, tonumber(id))
 	end
 	
 	table.sort(sequence)
 	
-	local stream = Stream.new()
+	const stream = Stream.new()
 	for _, id in sequence do
-		local frame = self.frameBuffer[tostring(id)]
-		local id = assert(tonumber(id))
+		const frame = self.frameBuffer[tostring(id)]
+		const frameId = assert(tonumber(id))
 		local count = 0
-		
+
 		for _ in frame do
 			count += 1
 		end
-		
-		stream:writeu16(id)
+
+		stream:writeu16(frameId)
 		stream:writeu16(count)
 		
 		for instanceId, state in frame do
@@ -328,7 +334,7 @@ function Serializer:buildFrameBuffer()
 					self:writeStringId(stream, name)
 					self:writePropertyValueToStream(stream, propData.value)
 
-					local ease = propData.ease
+					const ease = propData.ease
 					stream:writebool(not not ease)
 
 					if ease then
@@ -338,16 +344,16 @@ function Serializer:buildFrameBuffer()
 						if ease.params then
 							stream:createMarker("PARAM_COUNT", 1)
 							
-							local count = 0
+							local paramCount = 0
 							for name, value in ease.params do
-								count += 1
-								
+								paramCount += 1
+
 								self:writeStringId(stream, name)
 								self:writePropertyValueToStream(stream, value)
 							end
-							
+
 							stream:seekMarker("PARAM_COUNT")
-							stream:writeu8(count)
+							stream:writeu8(paramCount)
 							stream:resume()
 						end
 					end
@@ -356,7 +362,7 @@ function Serializer:buildFrameBuffer()
 		end
 	end
 	
-	local sequenceStream = Stream.new()
+	const sequenceStream = Stream.new()
 	sequenceStream:writeu16(#sequence)
 	
 	for _, id in sequence do
@@ -370,8 +376,8 @@ function Serializer:buildFrameBuffer()
 	self.tree.sequence.Value = self:encodeStream(sequenceStream)
 end
 
-function Serializer:buildHierarchyStream()
-	local stream = Stream.new(nil, 512)
+function Serializer:buildHierarchyStream(): ()
+	const stream = Stream.new(nil, 512)
 
 	stream:createMarker("TARGET_COUNT", 2)
 
@@ -402,13 +408,13 @@ function Serializer:buildHierarchyStream()
 	self.tree.hierarchy.Value = self:encodeStream(stream)
 end
 
-function Serializer:buildCFrameRegistry()
+function Serializer:buildCFrameRegistry(): ()
 	for cframe, id in self.compressionDictionaries.cframes.data do
-		local realCFrame = self.realValues[cframe]
-		local bucketIndex = math.floor(id / 1000)
+		const realCFrame = self.realValues[cframe]
+		const bucketIndex = math.floor(id / 1000)
 
 		if not self.tree.cframes:FindFirstChild(bucketIndex) then
-			local newEntry = Instance.new("Configuration")
+			const newEntry = Instance.new("Configuration")
 			newEntry.Name = bucketIndex
 			newEntry.Parent = self.tree.cframes
 		end
@@ -417,12 +423,12 @@ function Serializer:buildCFrameRegistry()
 	end
 end
 
-function Serializer:buildDictBuffer()
-	local stream = Stream.new()
+function Serializer:buildDictBuffer(): ()
+	const stream = Stream.new()
 	
-	local objectDict = self.compressionDictionaries.objects
-	local stringDict = self.compressionDictionaries.strings
-	local valueDict = self.compressionDictionaries.values
+	const objectDict = self.compressionDictionaries.objects
+	const stringDict = self.compressionDictionaries.strings
+	const valueDict = self.compressionDictionaries.values
 
 	stream:writeu16(stringDict.count)
 	for str, id in stringDict.data do
@@ -461,7 +467,7 @@ function Serializer:buildDictBuffer()
 	self.tree.dict.Value = self:encodeStream(stream)
 end
 
-function Serializer:serializeMarkerTrack(stream, track)
+function Serializer:serializeMarkerTrack(stream: any, track: any): ()
 	local frameCount = 0
 	
 	stream:createMarker("COUNT", 2)
@@ -515,8 +521,8 @@ function Serializer:serializeMarkerTrack(stream, track)
 	stream:clearMarkers()
 end
 
-function Serializer:buildMarkerBuffer()
-	local stream = Stream.new(nil, 512)
+function Serializer:buildMarkerBuffer(): ()
+	const stream = Stream.new(nil, 512)
 	
 	self:serializeMarkerTrack(stream, self.markers.finish)
 	self:serializeMarkerTrack(stream, self.markers.start)

@@ -1,44 +1,46 @@
-local Resolver = require("../Resolver")
-local StaticProps = require("../../StaticProps")
-local EQ = require("@self/EQ")
+--!optimize 2
+const LogService = game:GetService("LogService")
 
-local CONSTANT_INTERPS = {
+const StaticProps = require("../../StaticProps")
+const EQ = require("@self/EQ")
+
+const CONSTANT_INTERPS = {
 	["Instance"] = true,
 	["boolean"] = true,
 	["string"] = true,
 	["nil"] = true,
 }
 
-local VALUE_HANDLERS = {
-	EnumType = function(inst, baseValue)
+const VALUE_HANDLERS = {
+	EnumType = function(inst: any, baseValue: any): any
 		return Enum[inst.Value][baseValue]
 	end,
 
-	Vector2 = function(inst, baseValue)
+	Vector2 = function(inst: Instance, baseValue: any): Vector2
 		return Vector2.new(baseValue.X, baseValue.Y)
 	end,
 
-	ColorSequence = function(inst, baseValue)
+	ColorSequence = function(inst: Instance, baseValue: any): ColorSequence
 		return ColorSequence.new(baseValue)
 	end,
 
-	NumberSequence = function(inst, baseValue)
+	NumberSequence = function(inst: Instance, baseValue: any): NumberSequence
 		return NumberSequence.new(baseValue)
 	end,
 
-	NumberRange = function(inst, baseValue)
+	NumberRange = function(inst: Instance, baseValue: any): NumberRange
 		return NumberRange.new(baseValue)
 	end
 }
 
-local function readValue(value)
+const function readValue(value: any): any
 	if not value:IsA("ValueBase") then
 		return value:GetAttribute("Value")
 	end
 
-	local baseValue = value.Value
+	const baseValue = value.Value
 	for name, handler in VALUE_HANDLERS do
-		local inst = value:FindFirstChild(name)
+		const inst = value:FindFirstChild(name)
 
 		if inst then
 			return handler(inst, baseValue)
@@ -48,21 +50,21 @@ local function readValue(value)
 	return baseValue
 end
 
-local function optimizeKeyframes(frames, isStatic)
-	local optimized = {}
+const function optimizeKeyframes(frames: {any}, isStatic: any?): { any }
+	const optimized = {}
 
 	local idx = 1
 	while idx <= #frames do
-		local currentFrame = frames[idx]
+		const currentFrame = frames[idx]
 
 		while idx <= #frames do
-			local nextFrame = frames[idx + 1]
+			const nextFrame = frames[idx + 1]
 			if not nextFrame then
 				break 
 			end 
 
-			local diff = nextFrame.startTime - currentFrame.startTime
-			local isValueSame = EQ(nextFrame.value, currentFrame.value)
+			const diff = nextFrame.startTime - currentFrame.startTime
+			const isValueSame = EQ(nextFrame.value, currentFrame.value)
 
 			if diff < 1 or not isValueSame or currentFrame.eases then
 				break
@@ -84,27 +86,27 @@ local function optimizeKeyframes(frames, isStatic)
 	return optimized
 end
 
-local function parseKeyframes(keyframesInst, instance, disableOptimization)
-	local packs = keyframesInst:QueryDescendants(">Folder")
+const function parseKeyframes(keyframesInst: Instance, instance: Instance, disableOptimization: boolean): { any }
+	const packs = keyframesInst:QueryDescendants(">Folder")
 
-	local packInstances = {}
-	local keyframes = {}
+	const packInstances = {}
+	const keyframes = {}
 	
-	local isStatic = StaticProps[instance.ClassName]
+	const isStatic = StaticProps[instance.ClassName]
 		and StaticProps[instance.ClassName][keyframesInst.Name]
 
 	local isConstant = false
 
 	for _, inst in packs do
-		local packId = tonumber(inst.Name)
+		const packId = tonumber(inst.Name)
 		packInstances[packId] = inst 
 
-		local values = assert(
+		const values = assert(
 			inst:FindFirstChild("Values"), 
 			"keyframe pack has no values"
 		)
 
-		local eases = inst:FindFirstChild("Eases")
+		const eases = inst:FindFirstChild("Eases")
 		local valueModifier 
 		
 		for name, handler in VALUE_HANDLERS do
@@ -114,7 +116,7 @@ local function parseKeyframes(keyframesInst, instance, disableOptimization)
 		end
 
 		for _, keyframe in values:GetChildren() do
-			local frameIdx =  tonumber(keyframe.Name)
+			const frameIdx =  tonumber(keyframe.Name)
 			if not frameIdx then
 				continue
 			end
@@ -122,13 +124,13 @@ local function parseKeyframes(keyframesInst, instance, disableOptimization)
 			local easeData
 
 			if eases then 
-				local ease = eases:FindFirstChild(keyframe.Name)
+				const ease = eases:FindFirstChild(keyframe.Name)
 
 				if ease then
-					local easeType = ease:FindFirstChild("Type")
-					local easeParams = ease:FindFirstChild("Params")
+					const easeType = ease:FindFirstChild("Type")
+					const easeParams = ease:FindFirstChild("Params")
 					
-					local params = {}
+					const params = {}
 
 					if easeParams then
 						for _, child in easeParams:GetChildren() do
@@ -168,22 +170,22 @@ local function parseKeyframes(keyframesInst, instance, disableOptimization)
 		end 
 	end
 	
-	table.sort(keyframes, function(a, b)
+	table.sort(keyframes, function(a: any, b: any): boolean
 		return a.pack + a.idx < b.pack + b.idx
 	end)
 
-	local frames = {}
+	const frames = {}
 
 	while true do
-		local currentFrame = table.remove(keyframes, 1)
+		const currentFrame = table.remove(keyframes, 1)
 		if not currentFrame then
 			break
 		end
 
-		local nextFrame = keyframes[1]
+		const nextFrame = keyframes[1]
 		if nextFrame then
-			local diff = nextFrame.startFrame - currentFrame.startFrame
-			local isValueSame = EQ(nextFrame.value, currentFrame.value)
+			const diff = nextFrame.startFrame - currentFrame.startFrame
+			const isValueSame = EQ(nextFrame.value, currentFrame.value)
 
 			if not currentFrame.static then
 				if diff >= 1 and currentFrame.eases and not isValueSame then
@@ -228,7 +230,7 @@ local function parseKeyframes(keyframesInst, instance, disableOptimization)
 	return optimizeKeyframes(frames)
 end
 
-local function insertMarker(markers, frame, identifier, name, kfMarkers)
+const function insertMarker(markers: any, frame: number, identifier: number, name: string, kfMarkers: any): ()
 	local markerData = markers[frame]
 	if not markerData then
 		markerData = {}
@@ -244,23 +246,23 @@ local function insertMarker(markers, frame, identifier, name, kfMarkers)
 	end
 end
 
-local function parseKFMarkers(track)
-	local kf = track:FindFirstChild("KFMarkers")
-	local markers = {}
+const function parseKFMarkers(track: Instance): { [string]: string }
+	const kf = track:FindFirstChild("KFMarkers")
+	const markers = {}
 	
 	if kf then
 		for _, val in kf:QueryDescendants("StringValue > StringValue#Val") do
-			local name = val.Parent.Value
-			local val = val.Value 
-			
-			markers[name] = val
+			const name = val.Parent.Value
+			const value = val.Value
+
+			markers[name] = value
 		end
 	end
 
 	return markers
 end
 
-local function offsetValueByDefault(value, propName, default, realInstance, relativeOffset)
+const function offsetValueByDefault(value: any, propName: string, default: any, realInstance: Instance, relativeOffset: boolean): any
 	if relativeOffset == false then
 		return value
 	end
@@ -274,44 +276,44 @@ local function offsetValueByDefault(value, propName, default, realInstance, rela
 	return value
 end
 
-local function ParseHierarchy(data, save, disableOptimization, relativeOffset, resolver)
-	local frameBuffer = {}
-	local defaults = {}
-	local tree = {}
+const function ParseHierarchy(data: any, save: StringValue, disableOptimization: boolean, relativeOffset: boolean, resolver: any)
+	const frameBuffer = {}
+	const defaults = {}
+	const tree = {}
 	
-	local markers = {
+	const markers = {
 		start = {},
 		finish = {}
 	}
 	
 	for idx, item in data.Items do
-		local identifier = item.Identifier
-		local itemData = {
+		const identifier = item.Identifier
+		const itemData = {
 			Identifier = identifier
 		}
 		
-		local frame = save:FindFirstChild(idx)
+		const frame = save:FindFirstChild(idx)
 		
-		local rig = frame:FindFirstChild("Rig")
-		local markerTrack = frame:FindFirstChild("MarkerTrack")
+		const rig = frame:FindFirstChild("Rig")
+		const markerTrack = frame:FindFirstChild("MarkerTrack")
 
-		local realInstance = resolver:resolveInstance(item.Path)
+		const realInstance = resolver:resolveInstance(item.Path)
 		if not realInstance then
-			return error("failed to resolve: " .. table.concat(item.Path.InstanceNames, "."))
+			return LogService:Error("[MoonPlayer/Compiler/Serializer/Hierarchy]: failed to resolve {path}", {path = table.concat(item.Path.InstanceNames, ".")})
 		end
 
 		if rig and item.Path.ItemType == "Rig" then
-			local jointsHier = resolver:resolveJoints(realInstance)
+			const jointsHier = resolver:resolveJoints(realInstance)
 			
-			local joints = rig:QueryDescendants(">#_joint")
-			local jointData = {}
+			const joints = rig:QueryDescendants(">#_joint")
+			const jointData = {}
 		
 			for _, joint in joints do
-				local jointId = joint:GetAttribute("Identifier")
+				const jointId = joint:GetAttribute("Identifier")
 				
-				local hier = joint:FindFirstChild("_hier").Value
+				const hier = joint:FindFirstChild("_hier").Value
 				local default = joint:FindFirstChild("default")
-				local keyframes = joint:FindFirstChild("_keyframes")
+				const keyframes = joint:FindFirstChild("_keyframes")
 
 				if default then
 					default = readValue(default)
@@ -322,13 +324,13 @@ local function ParseHierarchy(data, save, disableOptimization, relativeOffset, r
 				end
 				
 				if keyframes then
-					local joint = jointsHier[hier]
-					if not joint then
-						return error(`failed to resolve: {hier}`)
+					const hierJoint = jointsHier[hier]
+					if not hierJoint then
+						return LogService:Error("[MoonPlayer/Compiler/Serializer/Hierarchy]: failed to resolve {hier}", {hier = hier})
 					end
-					
-					local isMotor6D = joint:IsA("Motor6D")
-					for _, keyframe in parseKeyframes(keyframes, joint, disableOptimization) do
+
+					const isMotor6D = hierJoint:IsA("Motor6D")
+					for _, keyframe in parseKeyframes(keyframes, hierJoint, disableOptimization) do
 						local value = keyframe.value
 						local frameData = frameBuffer[tostring(keyframe.startTime)]
 						
@@ -371,8 +373,8 @@ local function ParseHierarchy(data, save, disableOptimization, relativeOffset, r
 			itemData.Joints = jointData
 		else 
 			for _, child in frame:QueryDescendants(">Folder:not(#MarkerTrack)") do
-				local default = child:FindFirstChild("default")
-				local propName = child.Name
+				const default = child:FindFirstChild("default")
+				const propName = child.Name
 				local defaultValue
 
 				local instDefaults = defaults[tostring(identifier)]
@@ -418,7 +420,7 @@ local function ParseHierarchy(data, save, disableOptimization, relativeOffset, r
 						)
 					end 
 
-					local prop = {
+					const prop = {
 						props = {
 							[child.Name] = {
 								ease = keyframe.ease,
@@ -444,15 +446,15 @@ local function ParseHierarchy(data, save, disableOptimization, relativeOffset, r
 		
 		if markerTrack then
 			for _, track in markerTrack:GetChildren() do
-				local startFrame = assert(tonumber(track.Name))
-				local width = assert(track:FindFirstChild("width")).Value
-				local name = assert(track:FindFirstChild("name")).Value
-				local kfMarkers = parseKFMarkers(track)
+				const startFrame = assert(tonumber(track.Name))
+				const width = assert(track:FindFirstChild("width")).Value
+				const name = assert(track:FindFirstChild("name")).Value
+				const kfMarkers = parseKFMarkers(track)
 
 				insertMarker(markers.start, startFrame, identifier, name, kfMarkers)
 				
 				if width > 0 then
-					local finishFrame = math.min(startFrame + width, data.Information.Length)
+					const finishFrame = math.min(startFrame + width, data.Information.Length)
 
 					insertMarker(markers.finish, finishFrame, identifier, name, kfMarkers)
 				end

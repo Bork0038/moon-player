@@ -1,6 +1,7 @@
-return function(a, b)
-    local t = typeof(a)
-
+--!optimize 2
+const function EQ(a: any, b: any): boolean
+    const t = typeof(a)
+    
     if t ~= typeof(b) then
         return false
     end 
@@ -13,7 +14,7 @@ return function(a, b)
         end
 
         for i, kp in a.Keypoints do
-            local bkp = b.Keypoints[i]
+            const bkp = b.Keypoints[i]
 
             if kp.Time ~= bkp.Time or kp.Value ~= bkp.Value then 
                 return false 
@@ -27,7 +28,7 @@ return function(a, b)
         end
 
         for i, kp in a.Keypoints do
-            local bkp = b.Keypoints[i]
+            const bkp = b.Keypoints[i]
 
             if kp.Time ~= bkp.Time or kp.Value ~= bkp.Value or kp.Envelope ~= bkp.Envelope then 
                 return false 
@@ -38,3 +39,5 @@ return function(a, b)
     end
     return a == b
 end
+
+return EQ

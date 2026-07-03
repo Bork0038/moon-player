@@ -1,3 +1,4 @@
+--!optimize 2
 local __index do
 	xpcall(function(...)
 		return game.MoonPlayer
@@ -6,16 +7,16 @@ local __index do
 	end)
 end
 
-local function mergePath(path, start, finish)
+const function mergePath(path: { InstanceNames: { string }, InstanceTypes: { string } }, start: number, finish: number): string
 	return table.concat(path.InstanceNames, ".", start, finish)
 end
 
-local function fastResolvePath(path, root)
-	local tbl = {}
+const function fastResolvePath(path: { InstanceNames: { string }, InstanceTypes: { string } }, root: Instance): Instance?
+	const tbl = {}
 
 	for i = 2, #path.InstanceNames do
-		local class = path.InstanceTypes[i]
-		local name = path.InstanceNames[i]
+		const class = path.InstanceTypes[i]
+		const name = path.InstanceNames[i]
 
 		table.insert(tbl, `{class}[Name = "{name}"]`)
 	end
@@ -24,10 +25,10 @@ local function fastResolvePath(path, root)
 end
 
 
-local Resolver = {}
+const Resolver = {}
 
-function Resolver.new(overrides, excluded)
-	local self = {
+function Resolver.new(overrides: { [string]: Instance }, excluded: { string })
+	const self = {
 		cache = {},
 		internalCache = {},
 		excluded = excluded,
@@ -43,12 +44,12 @@ function Resolver.new(overrides, excluded)
 	})
 end
 
-function Resolver:resolveJoints(hier)
-	local joints = {}
+function Resolver:resolveJoints(hier: Instance): { [string]: Instance }
+	const joints = {}
 
 	for _, inst in hier:QueryDescendants("Motor6D") do
-		local part1 = inst.Part1 
-		local name = part1 and part1.Name
+		const part1 = inst.Part1 
+		const name = part1 and part1.Name
 
 		if not name then
 			continue
@@ -68,23 +69,23 @@ function Resolver:resolveJoints(hier)
 	end
 
 	for name, data in joints do
-		local joint = data.inst
-		local class = joint.ClassName
+		const joint = data.inst
+		const class = joint.ClassName
 		
 		if class == "Motor6D" then
-			local part0 = joint.part0
+			const part0 = joint.part0
 			if not part0 then
 				continue
 			end 
 
-			local data0 = joints[part0.Name]
+			const data0 = joints[part0.Name]
 			if not data0 then
 				continue
 			end 
 
 			data0.children[name] = data
 		elseif class == "Bone" then
-			local parentBone = joints[joint.Parent.Name]
+			const parentBone = joints[joint.Parent.Name]
 			if not parentBone then
 				continue
 			end
@@ -93,10 +94,10 @@ function Resolver:resolveJoints(hier)
 		end
 	end
 
-	local hiers = {}
-	local function recurse(name, joint, path)
+	const hiers = {}
+	local function recurse(name: string, joint: any, path: string): ()
 		for childName, childJoint in joint.children do
-			local newPath = path .. "." .. childName
+			const newPath = path .. "." .. childName
 			hiers[newPath] = childJoint.inst
 
 			recurse(childName, childJoint, newPath)
@@ -112,7 +113,7 @@ function Resolver:resolveJoints(hier)
 	return hiers
 end 
 
-function Resolver:resolveInstance(path, root)
+function Resolver:resolveInstance(path: { InstanceNames: { string }, InstanceTypes: { string } }, root: Instance?): Instance?
 	root = root or game
 
 	if tostring(path.InstanceNames[1]):lower() == "game" then
@@ -120,8 +121,8 @@ function Resolver:resolveInstance(path, root)
 		table.remove(path.InstanceTypes, 1)
 	end 
 
-	local key = mergePath(path, 1, #path.InstanceNames)
-	local cachedInstance = self.cache[key]
+	const key = mergePath(path, 1, #path.InstanceNames)
+	const cachedInstance = self.cache[key]
 
 	if self.excluded[key] then
 		return 
@@ -131,18 +132,18 @@ function Resolver:resolveInstance(path, root)
 		return cachedInstance
 	end
 
-	local names = path.InstanceNames
-	local types = path.InstanceTypes
+	const names = path.InstanceNames
+	const types = path.InstanceTypes
 	
-	local suffixTypes = { types[#names] }
-	local suffixNames = { names[#names] }
+	const suffixTypes = { types[#names] }
+	const suffixNames = { names[#names] }
 
 	local parentInst = root
 	local startIdx = 1
 
 	for i = #names - 1, 1, -1 do
-		local mergedPath = mergePath(path, 1, i)
-		local cachedInst = self.internalCache[mergedPath]
+		const mergedPath = mergePath(path, 1, i)
+		const cachedInst = self.internalCache[mergedPath]
 
 		if cachedInst then
 			parentInst = cachedInst
@@ -155,18 +156,18 @@ function Resolver:resolveInstance(path, root)
 	end
 
 	local outputInst
-	local suffixCount = #suffixNames
+	const suffixCount = #suffixNames
 
 	for i = 1, suffixCount do
-		local name = suffixNames[i]
-		local type = suffixTypes[i]
+		const name = suffixNames[i]
+		const type = suffixTypes[i]
 		
 		local success, inst = pcall(__index, parentInst, name)
 		if not success or typeof(inst) ~= "Instance" or inst.ClassName ~= type then
 			break
 		end
 
-		local instKey = mergePath(path, 1, startIdx + i - 1)
+		const instKey = mergePath(path, 1, startIdx + i - 1)
 
 		self.internalCache[instKey] = inst
 		parentInst = inst
@@ -177,7 +178,7 @@ function Resolver:resolveInstance(path, root)
 	end
 
 	if not outputInst then
-		local success, data = pcall(fastResolvePath, path, root)
+		local success, data = pcall(fastResolvePath, path, root :: Instance)
 
 		if success and typeof(data) == "Instance" then
 			outputInst = data
