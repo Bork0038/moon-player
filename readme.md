@@ -11,7 +11,10 @@ Credit to [MaximumADHD/Moonlite](https://github.com/MaximumADHD/Moonlite) for in
 - Uses a frame buffer to avoid having the entire track loaded into memory
 
 ## Installation
-
+```powershell
+wally install bork0038/moon-player
+```
+OR
 ```powershell
 aftman install
 rojo serve place.project.json
