@@ -3,7 +3,7 @@
 MoonPlayer is an experimental Moon Animator save player
 Due to its experimental state expect bugs
 
-Credit to [MaximumADHD/Moonlite](https://github.com/MaximumADHD/Moonlite) for interpolator + joint hierarchy resolver
+Credit to [MaximumADHD/Moonlite](https://github.com/MaximumADHD/Moonlite) for interpolator
 
 ## Features
 
