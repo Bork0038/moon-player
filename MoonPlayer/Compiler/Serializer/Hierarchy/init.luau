@@ -371,76 +371,75 @@ const function ParseHierarchy(data: any, save: StringValue, disableOptimization:
 			
 			itemData.JointCount = #joints
 			itemData.Joints = jointData
-		else 
-			for _, child in frame:QueryDescendants(">Folder:not(#MarkerTrack)") do
-				const default = child:FindFirstChild("default")
-				const propName = child.Name
-				local defaultValue
+		end 
 
-				local instDefaults = defaults[tostring(identifier)]
-				if not instDefaults then
-					instDefaults = {}
-					defaults[tostring(identifier)] = instDefaults
+		for _, child in frame:QueryDescendants(">Folder:not(#MarkerTrack, #Rig)") do
+			const default = child:FindFirstChild("default")
+			const propName = child.Name
+			local defaultValue
+
+			local instDefaults = defaults[tostring(identifier)]
+			if not instDefaults then
+				instDefaults = {}
+				defaults[tostring(identifier)] = instDefaults
+			end
+
+			if default then
+				defaultValue = readValue(default) 
+				instDefaults[child.Name] = defaultValue
+			else 
+				local success, defaultPropValue = pcall(function(...)
+					return child[propName]
+				end)
+
+				if success then
+					defaultValue = defaultPropValue
+					instDefaults[child.Name] = defaultPropValue 
 				end
+			end
 
-				if default then
-					defaultValue = readValue(default) 
-					instDefaults[child.Name] = defaultValue
-				else 
-					local success, defaultPropValue = pcall(function(...)
-						return child[propName]
-					end)
-
-					if success then
-						defaultValue = defaultPropValue
-						instDefaults[child.Name] = defaultPropValue 
-					end
-				end
-
-				for _, keyframe in parseKeyframes(child, realInstance, disableOptimization) do
-					local frameData = frameBuffer[tostring(keyframe.startTime)]
-					if not frameData then
-						frameData = {}
-						frameBuffer[tostring(keyframe.startTime)] = frameData
-					end
-					
-					local existingFrameData = frameData[tostring(identifier)]
-					if not existingFrameData then
-						existingFrameData = {}
-						frameData[tostring(identifier)] = existingFrameData
-					end
-					
-					if keyframe.ease then
-						keyframe.ease.target = offsetValueByDefault(
-							keyframe.ease.target,
-							propName,
-							defaultValue,
-							realInstance,
-							relativeOffset
-						)
-					end 
-
-					const prop = {
-						props = {
-							[child.Name] = {
-								ease = keyframe.ease,
-								value = offsetValueByDefault(
-									keyframe.value,
-									propName,
-									defaultValue,
-									realInstance,
-									relativeOffset
-								)
-							}
-						},
-
-						propCount = 1,
-						count = keyframe.count	
-					}
-					
-					table.insert(existingFrameData, prop)
+			for _, keyframe in parseKeyframes(child, realInstance, disableOptimization) do
+				local frameData = frameBuffer[tostring(keyframe.startTime)]
+				if not frameData then
+					frameData = {}
+					frameBuffer[tostring(keyframe.startTime)] = frameData
 				end
 				
+				local existingFrameData = frameData[tostring(identifier)]
+				if not existingFrameData then
+					existingFrameData = {}
+					frameData[tostring(identifier)] = existingFrameData
+				end
+				
+				if keyframe.ease then
+					keyframe.ease.target = offsetValueByDefault(
+						keyframe.ease.target,
+						propName,
+						defaultValue,
+						realInstance,
+						relativeOffset
+					)
+				end 
+
+				const prop = {
+					props = {
+						[child.Name] = {
+							ease = keyframe.ease,
+							value = offsetValueByDefault(
+								keyframe.value,
+								propName,
+								defaultValue,
+								realInstance,
+								relativeOffset
+							)
+						}
+					},
+
+					propCount = 1,
+					count = keyframe.count	
+				}
+				
+				table.insert(existingFrameData, prop)
 			end
 		end
 		
