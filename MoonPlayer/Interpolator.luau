@@ -18,22 +18,23 @@ const function lerp(a: any, b: any, t: number): any
 end
 
 function Interpolator.get(value: any): (start: any, goal: any, delta: number) -> any
-	if typeof(value) == "ColorSequence" then
+	local kind = typeof(value)
+	if kind == "ColorSequence" then
 		return function(start: ColorSequence, goal: ColorSequence, t: number): ColorSequence
 			const value = lerp(start.Keypoints[1].Value, goal.Keypoints[1].Value, t)
 			return ColorSequence.new(value)
 		end
-	elseif typeof(value) == "NumberSequence" then
+	elseif kind == "NumberSequence" then
 		return function(start: NumberSequence, goal: NumberSequence, t: number): NumberSequence
 			const value = lerp(start.Keypoints[1].Value, goal.Keypoints[1].Value, t)
 			return NumberSequence.new(value)
 		end
-	elseif typeof(value) == "NumberRange" then
+	elseif kind == "NumberRange" then
 		return function(start: NumberRange, goal: NumberRange, t: number): NumberRange
 			const value = lerp(start.Min, goal.Min, t)
 			return NumberRange.new(value)
 		end
-	elseif CONSTANT_INTERPS[typeof(value)] then
+	elseif CONSTANT_INTERPS[kind] then
 		return function(start: any, goal: any, t: number): any
 			if t >= 1 then
 				return goal
