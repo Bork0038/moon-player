@@ -45,69 +45,80 @@ function Resolver.new(overrides: { [string]: Instance }, excluded: { string })
 end
 
 function Resolver:resolveJoints(hier: Instance): { [string]: Instance }
-	const joints = {}
+	const nodes = {}
+	const nodeByJoint = {}
+	const nodeByCarrier = {}
 
-	for _, inst in hier:QueryDescendants("Motor6D") do
-		const part1 = inst.Part1 
-		const name = part1 and part1.Name
-
-		if not name then
-			continue
-		end 
-
-		joints[name] = {
+	local function insertNode(inst: Instance, name: string, carrier: Instance): ()
+		const node = {
 			inst = inst,
+			name = name,
 			children = {}
 		}
+
+		table.insert(nodes, node)
+		nodeByJoint[inst] = node
+		nodeByCarrier[carrier] = node
+	end
+
+	for _, inst in hier:QueryDescendants("Motor6D") do
+		const part1 = inst.Part1
+		const name = part1 and part1.Name
+
+		if not part1 or not name then
+			continue
+		end
+
+		insertNode(inst, name, part1)
 	end
 
 	for _, inst in hier:QueryDescendants("Bone") do
-		joints[inst.Name] = {
-			inst = inst,
-			children = {}
-		}
+		insertNode(inst, inst.Name, inst)
 	end
 
-	for name, data in joints do
-		const joint = data.inst
-		const class = joint.ClassName
-		
-		if class == "Motor6D" then
-			const part0 = joint.part0
-			if not part0 then
-				continue
-			end 
+	for _, node in nodes do
+		const joint = node.inst
 
-			const data0 = joints[part0.Name]
-			if not data0 then
-				continue
-			end 
+		if joint:IsA("Motor6D") then
+			const part0 = joint.Part0
+			const parentNode = part0 and nodeByCarrier[part0]
 
-			data0.children[name] = data
-		elseif class == "Bone" then
-			const parentBone = joints[joint.Parent.Name]
-			if not parentBone then
-				continue
+			if parentNode then
+				table.insert(parentNode.children, node)
 			end
+		elseif joint:IsA("Bone") then
+			const parentNode = nodeByCarrier[joint.Parent]
 
-			parentBone.children[name] = data
+			if parentNode then
+				table.insert(parentNode.children, node)
+			end
 		end
+	end
+
+	for _, node in nodes do
+		table.sort(node.children, function(a: any, b: any): boolean
+			return a.name < b.name
+		end)
 	end
 
 	const hiers = {}
-	local function recurse(name: string, joint: any, path: string): ()
-		for childName, childJoint in joint.children do
-			const newPath = path .. "." .. childName
-			hiers[newPath] = childJoint.inst
-
-			recurse(childName, childJoint, newPath)
+	local function recurse(node: any, path: string, visited: { [Instance]: boolean }): ()
+		if visited[node.inst] then
+			return
 		end
+
+		visited[node.inst] = true
+		hiers[path] = node.inst
+
+		for _, child in node.children do
+			recurse(child, path .. "." .. child.name, visited)
+		end
+
+		visited[node.inst] = nil
 	end
 
-	for name, data in joints do
-		hiers[name] = data.inst
-		
-		recurse(name, data, name)
+	for _, node in nodes do
+		recurse(node, node.name, {})
 	end
 
 	return hiers

@@ -388,7 +388,6 @@ const function update(delta: number): ()
 			continue
 		end
 
-		const frameId = tostring(currentFrame)
 		const instanceOverride = track.Deserializer.targetOverrides
 		const classNames = track.ClassNames
 		const instances = track.Deserializer.targets
@@ -396,6 +395,11 @@ const function update(delta: number): ()
 		for frameNum = lastFrame + 1, currentFrame do
 			const currentFrameId = tostring(frameNum)
 			const frame = track.FrameAdvance[currentFrameId]
+			const frameSignal = track.FrameSignals[currentFrameId]
+
+			if frameSignal then
+				frameSignal:Fire()
+			end
 
 			if not frame then
 				continue
@@ -425,11 +429,6 @@ const function update(delta: number): ()
 
 			track.FrameAdvance[currentFrameId] = nil
 		end 
-	
-		const frameSignal = track.FrameSignals[frameId]
-		if frameSignal then
-			frameSignal:Fire()
-		end
 		
 		while true do
 			const marker = track.MarkerSequence[1]
