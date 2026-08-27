@@ -20,6 +20,22 @@ local SpecialProps do
 			}
 		},
 
+		Part = {
+			Simple = {
+				ApplyTexture = function(inst: MeshPart, value: string): ()
+					
+				end
+			}
+		},
+
+		MeshPart = {
+			Simple = {
+				ApplyTexture = function(inst: MeshPart, value: string): ()
+					inst.TextureID = value
+				end
+			}
+		},
+
 		ParticleEmitter = {
 			Simple = {
 				Clear = ParticleEmitterInstance.Clear,
