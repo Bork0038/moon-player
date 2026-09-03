@@ -52,13 +52,19 @@ local SpecialProps do
 	}
 end
 
+
+local SetProp = select(2, xpcall(
+	function(...) game.A = nil end, 
+	function() return debug.info(2, "f") end
+))
+
 const function ApplyProp(inst: Instance, className: string?, name: string, value: any, player: any)
 	className = className or inst.ClassName
 
 	const specialClass = SpecialProps[className]
 
 	if not specialClass then
-		inst[name] = value
+		SetProp(inst, name, value)
 		return
 	end
 
@@ -78,9 +84,10 @@ const function ApplyProp(inst: Instance, className: string?, name: string, value
 		end
 	end
 
-	inst[name] = value
+	SetProp(inst, name, value)
 
 	return nil
 end
+
 
 return ApplyProp
